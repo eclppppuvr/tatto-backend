@@ -1,0 +1,23 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: tattoo
+      POSTGRES_PASSWORD: tattoo
+      POSTGRES_DB: tattoo
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tattoo"]
+      interval: 5s
+      retries: 10
+  api:
+    build: .
+    environment:
+      DB_URL: postgresql+psycopg://tattoo:tattoo@db:5432/tattoo
+      JWT_SECRET: ${JWT_SECRET:?задайте JWT_SECRET (>= 32 символов)}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    depends_on:
+      db: {condition: service_healthy}
+    ports: ["8000:8000"]
+volumes:
+  pgdata:
