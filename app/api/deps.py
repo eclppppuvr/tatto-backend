@@ -12,7 +12,8 @@ from ..security import decode_access_token
 from ..services.auth import AuthService
 from ..services.sketches import EmptySketchRepo
 from ..services.users import UserService
-from ..db.repos import SqlProfileRepo, SqlRefreshTokenRepo, SqlUserRepo
+from ..db.repos import SqlJobRepo, SqlProfileRepo, SqlRefreshTokenRepo, SqlUserRepo
+from ..services.jobs import JobService
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -39,6 +40,10 @@ def get_auth_service(request: Request, session: Session = Depends(get_session)) 
 def get_user_service(session: Session = Depends(get_session)) -> UserService:
     # TB-03/TB-04: заменить EmptySketchRepo на реализацию поверх MongoDB.
     return UserService(SqlUserRepo(session), SqlProfileRepo(session), EmptySketchRepo())
+
+
+def get_job_service(request: Request, session: Session = Depends(get_session)) -> JobService:
+    return JobService(SqlJobRepo(session), request.app.state.dispatcher, commit=session.commit)
 
 
 def current_user_id(request: Request, creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> UUID:

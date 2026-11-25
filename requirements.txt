@@ -6,3 +6,7 @@ alembic>=1.13
 pydantic[email]>=2.7
 bcrypt>=4.2
 PyJWT>=2.8
+celery[redis]>=5.4
+redis>=5.0.1
+boto3>=1.34
+packaging>=23

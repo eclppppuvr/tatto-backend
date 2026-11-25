@@ -50,3 +50,38 @@ class SketchSummary:
     source: str            # extract | generation
     thumbnail: str | None  # s3-ключ миниатюры
     created_at: datetime
+
+
+class JobType(str, Enum):
+    EXTRACT_SKETCH = "extract_sketch"
+    GENERATE_DESIGN = "generate_design"
+    TRY_ON = "try_on"
+
+
+class JobStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+TERMINAL_STATUSES = frozenset({JobStatus.DONE, JobStatus.FAILED, JobStatus.CANCELLED})
+
+
+@dataclass
+class Job:
+    id: UUID
+    user_id: UUID
+    type: JobType
+    status: JobStatus
+    progress: int
+    input_ref: str
+    output_ref: str | None
+    error_code: str | None
+    error_message: str | None
+    retry_count: int
+    created_at: datetime
+    updated_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None

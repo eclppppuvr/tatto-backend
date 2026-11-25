@@ -8,9 +8,9 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..domain.entities import Profile, RefreshToken, User
+from ..domain.entities import Job, Profile, RefreshToken, User
 from ..domain.errors import EmailTaken
-from .models import ProfileRow, RefreshTokenRow, UserRow
+from .models import JobRow, ProfileRow, RefreshTokenRow, UserRow
 
 
 def _aware(dt: datetime) -> datetime:
@@ -95,3 +95,44 @@ class SqlRefreshTokenRepo:
             .values(revoked=True)
         )
         return result.rowcount == 1
+
+
+def _opt_aware(dt: datetime | None) -> datetime | None:
+    return _aware(dt) if dt else None
+
+
+def _job(row: JobRow) -> Job:
+    return Job(row.id, row.user_id, row.type, row.status, row.progress, row.input_ref, row.output_ref,
+               row.error_code, row.error_message, row.retry_count, _aware(row.created_at),
+               _aware(row.updated_at), _opt_aware(row.started_at), _opt_aware(row.finished_at))
+
+
+class SqlJobRepo:
+    _MUTABLE = ("status", "progress", "output_ref", "error_code", "error_message", "retry_count",
+                "updated_at", "started_at", "finished_at")
+
+    def __init__(self, session: Session):
+        self._s = session
+
+    def add(self, job: Job) -> Job:
+        self._s.add(JobRow(
+            id=job.id, user_id=job.user_id, type=job.type, status=job.status, progress=job.progress,
+            input_ref=job.input_ref, output_ref=job.output_ref, error_code=job.error_code,
+            error_message=job.error_message, retry_count=job.retry_count, created_at=job.created_at,
+            updated_at=job.updated_at, started_at=job.started_at, finished_at=job.finished_at,
+        ))
+        self._s.flush()
+        return job
+
+    def get(self, job_id: UUID) -> Job | None:
+        row = self._s.get(JobRow, job_id)
+        return _job(row) if row else None
+
+    def save(self, job: Job) -> Job:
+        row = self._s.get(JobRow, job.id)
+        if row is None:
+            raise LookupError(f"job {job.id} не найден")
+        for name in self._MUTABLE:
+            setattr(row, name, getattr(job, name))
+        self._s.flush()
+        return job

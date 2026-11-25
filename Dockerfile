@@ -6,5 +6,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app app
 COPY migrations migrations
 COPY alembic.ini .
+# Не запускаем API и Celery от root
+RUN useradd --create-home --uid 1000 app
+USER app
 EXPOSE 8000
 CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000"]

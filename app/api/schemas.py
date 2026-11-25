@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
 
-from ..domain.entities import Role
+from ..domain.entities import JobStatus, Role
 
 
 class RegisterRequest(BaseModel):
@@ -96,3 +96,14 @@ class SketchPage(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+class JobOut(BaseModel):
+    id: UUID
+    status: JobStatus
+    progress: int
+    output_ref: str | None
+    error_code: str | None
+    error_message: str | None
+    created_at: datetime
+    finished_at: datetime | None

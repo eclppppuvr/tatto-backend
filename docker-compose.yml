@@ -1,3 +1,14 @@
+﻿x-app-env: &app-env
+  DB_URL: postgresql+psycopg://tattoo:tattoo@db:5432/tattoo
+  JWT_SECRET: ${JWT_SECRET:?задайте JWT_SECRET (>= 32 символов)}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+  REDIS_URL: redis://redis:6379/0
+  S3_URL: http://s3:9090
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:-tattoo}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:-tattoo-secret-123}
+  S3_BUCKET: tattoo
+  AI_ENGINE: ${AI_ENGINE:-stub}
+
 services:
   db:
     image: postgres:16
@@ -10,14 +21,37 @@ services:
       test: ["CMD-SHELL", "pg_isready -U tattoo"]
       interval: 5s
       retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  # Dev-хранилище с S3 API (MinIO больше не публикует образы). В проде — любой S3-совместимый сервис.
+  s3:
+    image: adobe/s3mock
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: tattoo
+      initialBuckets: tattoo
+    ports: ["9090:9090"]
+
   api:
     build: .
-    environment:
-      DB_URL: postgresql+psycopg://tattoo:tattoo@db:5432/tattoo
-      JWT_SECRET: ${JWT_SECRET:?задайте JWT_SECRET (>= 32 символов)}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    environment: *app-env
     depends_on:
       db: {condition: service_healthy}
+      redis: {condition: service_healthy}
     ports: ["8000:8000"]
+
+  worker-cpu:
+    build: .
+    command: celery -A app.worker.main:celery worker -Q cpu -l info
+    environment: *app-env
+    depends_on:
+      api: {condition: service_started}   # api применяет миграции при старте
+      redis: {condition: service_healthy}
+
 volumes:
   pgdata:

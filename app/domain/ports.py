@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Protocol
 from uuid import UUID
 
-from .entities import Profile, RefreshToken, SketchSummary, User
+from .entities import Job, Profile, RefreshToken, SketchSummary, User
 
 
 class UserRepo(Protocol):
@@ -33,3 +33,20 @@ class SketchRepo(Protocol):
 class PasswordHasher(Protocol):
     def hash(self, password: str) -> str: ...
     def verify(self, password: str, hashed: str) -> bool: ...
+
+
+class JobRepo(Protocol):
+    def add(self, job: Job) -> Job: ...
+    def get(self, job_id: UUID) -> Job | None: ...
+    def save(self, job: Job) -> Job:
+        """Сохраняет изменяемые поля (статус, прогресс, результат, ошибки, время)."""
+
+
+class EventPublisher(Protocol):
+    def publish(self, job: Job) -> None:
+        """Best-effort: сбой доставки не должен ронять обработку (есть polling-fallback)."""
+
+
+class JobDispatcher(Protocol):
+    def dispatch(self, job: Job) -> None:
+        """Ставит job в очередь. Вызывать только ПОСЛЕ коммита транзакции."""

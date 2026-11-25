@@ -15,6 +15,21 @@ class Settings:
     login_max_failures: int = 5       # TB-02 §5.2
     login_block_minutes: int = 15     # TB-02 §5.2
     cors_origins: tuple[str, ...] = ()
+    # --- инфраструктура фоновых задач (TB-03/04/05); None = компонент не настроен ---
+    redis_url: str | None = None           # pub/sub для WebSocket и (по умолчанию) брокер Celery
+    celery_broker_url: str | None = None   # если не задан, используется redis_url
+    s3_endpoint_url: str | None = None     # MinIO/S3
+    s3_access_key: str | None = None
+    s3_secret_key: str | None = None
+    s3_bucket: str = "tattoo"
+    s3_region: str = "us-east-1"
+    ai_engine: str = "stub"
+    job_time_limit_seconds: int = 120      # hard-limit AI-обработки (БТ)
+    job_max_retries: int = 3               # TB-03 §5.1
+
+    @property
+    def broker_url(self) -> str | None:
+        return self.celery_broker_url or self.redis_url
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -34,4 +49,14 @@ class Settings:
             login_max_failures=int(os.environ.get("LOGIN_MAX_FAILURES", 5)),
             login_block_minutes=int(os.environ.get("LOGIN_BLOCK_MINUTES", 15)),
             cors_origins=origins,
+            redis_url=os.environ.get("REDIS_URL") or None,
+            celery_broker_url=os.environ.get("CELERY_BROKER_URL") or None,
+            s3_endpoint_url=os.environ.get("S3_URL") or None,
+            s3_access_key=os.environ.get("S3_ACCESS_KEY") or None,
+            s3_secret_key=os.environ.get("S3_SECRET_KEY") or None,
+            s3_bucket=os.environ.get("S3_BUCKET", "tattoo"),
+            s3_region=os.environ.get("S3_REGION", "us-east-1"),
+            ai_engine=os.environ.get("AI_ENGINE", "stub"),
+            job_time_limit_seconds=int(os.environ.get("JOB_TIME_LIMIT_SECONDS", 120)),
+            job_max_retries=int(os.environ.get("JOB_MAX_RETRIES", 3)),
         )

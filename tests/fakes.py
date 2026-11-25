@@ -71,3 +71,43 @@ class FakeSketchRepo:
     def list_by_user(self, user_id, page, limit):
         start = (page - 1) * limit
         return self.items[start:start + limit], len(self.items)
+
+
+class FakeJobRepo:
+    def __init__(self):
+        self.items = {}
+        self.saves = 0
+
+    def add(self, job):
+        self.items[job.id] = job
+        return job
+
+    def get(self, job_id):
+        return self.items.get(job_id)
+
+    def save(self, job):
+        self.items[job.id] = job
+        self.saves += 1
+        return job
+
+
+class RecordingPublisher:
+    def __init__(self):
+        self.events = []
+
+    def publish(self, job):
+        from app.services.events import job_event
+        self.events.append(job_event(job))
+
+
+class RecordingDispatcher:
+    def __init__(self, fail=False, log=None):
+        self.dispatched = []
+        self.fail = fail
+        self.log = log if log is not None else []
+
+    def dispatch(self, job):
+        self.log.append("dispatch")
+        if self.fail:
+            raise ConnectionError("broker down")
+        self.dispatched.append(job)

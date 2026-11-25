@@ -9,12 +9,13 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import Engine
 from sqlalchemy.exc import OperationalError
 
-from .api import auth, users
+from .api import auth, jobs, users, ws
 from .config import Settings
 from .db.session import make_engine, make_session_factory
 from .domain.errors import AppError
 from .rate_limit import LoginRateLimiter
 from .security import BcryptHasher
+from .worker.dispatcher import build_dispatcher
 
 
 def create_app(settings: Settings | None = None, engine: Engine | None = None) -> FastAPI:
@@ -30,6 +31,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     app.state.settings = settings
     app.state.session_factory = make_session_factory(engine)
     app.state.hasher = BcryptHasher(settings.bcrypt_rounds)
+    app.state.dispatcher = build_dispatcher(settings)
     app.state.limiter = LoginRateLimiter(settings.login_max_failures, settings.login_block_minutes * 60)
 
     if settings.cors_origins:
@@ -46,6 +48,8 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
 
     app.include_router(auth.router, prefix="/v1")
     app.include_router(users.router, prefix="/v1")
+    app.include_router(jobs.router, prefix="/v1")
+    app.include_router(ws.router, prefix="/v1")
 
     @app.get("/health", tags=["service"])
     def health():

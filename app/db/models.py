@@ -4,11 +4,12 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Enum, ForeignKey, Index, String, Text, Uuid, func
+from sqlalchemy import (JSON, Boolean, DateTime, Enum, ForeignKey, Index, SmallInteger, String, Text, Uuid,
+                        desc, func, text)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from ..domain.entities import Role
+from ..domain.entities import JobStatus, JobType, Role
 
 JSONType = JSON().with_variant(JSONB(), "postgresql")
 
@@ -56,3 +57,32 @@ class RefreshTokenRow(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class JobRow(Base):
+    __tablename__ = "jobs"
+    __table_args__ = (
+        Index("ix_jobs_user_created", "user_id", desc("created_at")),
+        Index("ix_jobs_active_status", "status", postgresql_where=text("status IN ('pending', 'running')")),
+        Index("ix_jobs_type_status", "type", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    type: Mapped[JobType] = mapped_column(
+        Enum(JobType, name="job_type", values_callable=lambda e: [m.value for m in e]), nullable=False
+    )
+    status: Mapped[JobStatus] = mapped_column(
+        Enum(JobStatus, name="job_status", values_callable=lambda e: [m.value for m in e]),
+        nullable=False, default=JobStatus.PENDING, server_default=JobStatus.PENDING.value,
+    )
+    progress: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0, server_default="0")
+    input_ref: Mapped[str] = mapped_column(Text, nullable=False)
+    output_ref: Mapped[str | None] = mapped_column(Text)
+    error_code: Mapped[str | None] = mapped_column(String(50))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    retry_count: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

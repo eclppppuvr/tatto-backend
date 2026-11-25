@@ -49,3 +49,44 @@ class TooManyAttempts(AppError):
     # В спеке указана только блокировка на 15 минут, код не задан — берём 429.
     status_code = 429
     message = "Слишком много неудачных попыток входа. Повторите позже"
+
+
+class JobNotFound(AppError):
+    status_code = 404
+    message = "Job не найден"
+
+
+class JobForbidden(AppError):
+    status_code = 403
+    message = "Job не принадлежит пользователю"
+
+
+class StorageUnavailable(AppError):
+    status_code = 503
+    message = "Хранилище временно недоступно"
+
+
+# --- Ошибки обработки задач (не HTTP): их разбирает JobRunner ---
+
+class JobFailure(Exception):
+    """Окончательная ошибка обработки: job -> failed, без повторов."""
+
+    code = "job_failed"
+    message = "Не удалось обработать задачу"
+
+    def __init__(self, message: str | None = None, code: str | None = None):
+        super().__init__(message or self.message)
+        self.message = message or self.message
+        self.code = code or self.code
+
+
+class TransientJobError(JobFailure):
+    """Временный сбой (сеть, перегрузка модели): воркер повторит задачу с backoff."""
+
+    code = "transient_error"
+    message = "Временная ошибка обработки"
+
+
+class JobTimeout(JobFailure):
+    code = "model_timeout"
+    message = "AI-модель не ответила в течение 120 секунд"
