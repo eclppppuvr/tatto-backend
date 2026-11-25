@@ -21,7 +21,7 @@
 ## 1. Обзор изменения
 
 ### 1.1. Что делаем и тип изменения
-**Суть:** Пользователь вводит текстовое описание желаемой татуировки и выбирает стиль (из фиксированного набора или вводит свой). Система асинхронно генерирует уникальный тату-дизайн через AI-пайплайн (stub на MVP). Результат — готовый эскиз на белом фоне в MongoDB. Пользователь видит прогресс через WebSocket с fallback на polling.
+**Суть:** Пользователь вводит текстовое описание желаемой татуировки и выбирает стиль (из фиксированного набора или вводит свой). Система асинхронно генерирует уникальный тату-дизайн через AI-пайплайн (Yandex AI Studio / AliceAI). Результат — готовый эскиз на белом фоне в MongoDB. Пользователь видит прогресс через WebSocket с fallback на polling.
 
 **Тип:** новый функционал
 **Стороны:** Fullstack
@@ -49,7 +49,7 @@
 - **Контракт (запрос):** `POST /v1/generation`
   - Authorization: `Bearer <access_token>`
   - `prompt` (string, required, max 500) — текстовое описание желаемой татуировки
-  - `style` (enum, required) — стиль: `minimalism`, `oldschool`, `realism`, `geometry`, `japanese`, `custom`
+  - `style` (enum, required) — стиль: `minimalism`, `old_school`, `realism`, `geometry`, `japanese`, `custom`
   - `custom_style` (string, optional, max 100) — если style=custom, пользовательское описание стиля
 - **Контракт (ответ):** `202 Accepted`
   - `job_id` (UUID) — ID задачи
@@ -58,7 +58,7 @@
   ```json
   {
     "prompt": "Морской компас с якорем",
-    "style": "oldschool"
+    "style": "old_school"
   }
   ```
 - **Пример ответа (успех):**
@@ -155,7 +155,7 @@
   - `user_id` (UUID)
   - `source` (enum: `extract`, `generation`)
   - `prompt` (string) — промпт генерации
-  - `style` (enum: `minimalism`, `oldschool`, `realism`, `geometry`, `japanese`, `custom`)
+  - `style` (enum: `minimalism`, `old_school`, `realism`, `geometry`, `japanese`, `custom`)
   - `custom_style` (string | null) — пользовательский стиль
   - `status` (enum: `active`, `deleted`)
   - `s3` (object) — `result_png`, `thumbnail`
@@ -168,7 +168,7 @@
     "user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "source": "generation",
     "prompt": "Морской компас с якорем",
-    "style": "oldschool",
+    "style": "old_school",
     "custom_style": null,
     "status": "active",
     "s3": {
@@ -221,7 +221,7 @@
 
 - Подписка на очередь `cpu` (Celery + Redis broker)
 - Забирает задачу из очереди, обновляет Job на `running`, публикует прогресс в Redis pub/sub
-- Вызывает AIEngine.generate() (stub на MVP)
+- Вызывает AIEngine.generate_design() (Yandex AI Studio / AliceAI, 5 стилей: minimalism, old_school, realism, geometry, japanese + custom)
 - Сохраняет результат в S3 (`sketches/{uuid}.png`), создаёт документ в MongoDB (sketches, source=generation)
 - Обновляет Job на `done` (или `failed` при ошибке)
 
@@ -246,7 +246,7 @@
 ### 3.2. Данные и хранение
 
 - 🟢 `jobs` (PostgreSQL) — таблица: `type` (ENUM: `extract_sketch`, `generate_design`, `try_on`), для генерации: `input_ref` = промпт + стиль (TEXT), `output_ref` = MongoDB _id
-- 🟢 `sketches` (MongoDB) — коллекция: `source` (ENUM: `extract`, `generation`), `prompt` (string), `style` (ENUM: `minimalism`, `oldschool`, `realism`, `geometry`, `japanese`, `custom`), `custom_style` (string, nullable), `s3.result_png`, `s3.thumbnail`, `meta.seed` (long), `meta.steps` (int), `meta.model` (string), `meta.latency_ms` (int)
+- 🟢 `sketches` (MongoDB) — коллекция: `source` (ENUM: `extract`, `generation`), `prompt` (string), `style` (ENUM: `minimalism`, `old_school`, `realism`, `geometry`, `japanese`, `custom`), `custom_style` (string, nullable), `s3.result_png`, `s3.thumbnail`, `meta.seed` (long), `meta.steps` (int), `meta.model` (string), `meta.latency_ms` (int)
 - Индексы MongoDB: `{user_id: 1, created_at: -1}`, `{user_id: 1, source: 1}`, `{tags: 1}`, `{meta.model: 1}`
 - Миграции: нет (таблицы создаются в TB-03)
 
@@ -313,7 +313,7 @@
 - INT-1: синхронный ответ (202 Accepted), обработка асинхронная
 - INT-2: синхронный запрос к PostgreSQL
 - INT-3: WebSocket, Redis pub/sub
-- AI-пайплайн (stub): ~5 секунд на MVP (в будущем — до 120 секунд для SDXL)
+- AI-пайплайн (Yandex AI): ~5–30 секунд на MVP (зависит от стиля и сложности промпта)
 - Очередь Celery: `cpu` (для extract и generation)
 - Retry: max 3 попытки, exponential backoff (10s, 30s, 90s)
 - **Кэш: нет** (по решению аналитика, генерируем заново каждый раз)
@@ -337,7 +337,7 @@
 ### 6.1. Порядок выката
 
 1. BE: миграции БД (нет), API-эндпоинты (INT-1, INT-2, INT-4)
-2. Workers: Celery-воркер с AIEngine.generate() stub
+2. Workers: Celery-воркер с AIEngine.generate_design() (Yandex AI Studio / AliceAI)
 3. FE: интеграция с новыми эндпоинтами + WebSocket
 
 BE и workers деплоятся одновременно, FE — после.
@@ -361,7 +361,7 @@ BE и workers деплоятся одновременно, FE — после.
 
 - [ ] Роли в security-сервисе — роли `client`, `master`, `admin` (из TB-02)
 - [ ] DDL-миграция в репо владеющего сервиса — нет (таблицы из TB-03)
-- [ ] Конфиги по окружениям (dev/staging/prod) — S3_URL, REDIS_URL, CELERY_BROKER_URL, AI_ENGINE=stub
+- [ ] Конфиги по окружениям (dev/staging/prod) — S3_URL, REDIS_URL, CELERY_BROKER_URL, AI_ENGINE=yandex
 - [ ] Сервисные аккаунты для межсервисных вызовов — не требуется
 - [x] Фиче-флаги заведены — не требуются
 
@@ -380,6 +380,6 @@ BE и workers деплоятся одновременно, FE — после.
 - 🟡 К валидации: —
 - ❓ Открытые решения: —
 - ⚠️ Требует уточнения: —
-- Технические риски: AI-пайплайн (stub → реальные модели SDXL) — замена через env-флаг `AI_ENGINE=stub|real`
+- Технические риски: AI-пайплайн (Yandex AI Studio) — API-вызов; 5 фиксированных стилей + custom; параметры генерации (seed, steps) в meta
 - Унаследовано из БТ (бизнес-пробелы): —
 - Приложений из БТ: критерий времени генерации < 120 секунд
