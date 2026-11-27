@@ -10,8 +10,6 @@
 | Фундамент задач: `jobs`, `GET /v1/jobs/{id}`, `WS /v1/ws/jobs/{id}`, Celery (очереди `cpu`/`gpu`), S3, `AIEngine` | реализовано, движок пока `stub` |
 | TB-03 Extract, TB-04 Generation, TB-05 Try-On | не начато (обработчики, MongoDB, `/v1/sketches/*`, `/v1/generation`, `/v1/tryon`) |
 
-`com/` — наработки команды, в сервис не подключается (в `.gitignore`).
-
 ## Запуск
 
 ```bash
